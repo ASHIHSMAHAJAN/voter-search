@@ -30,7 +30,7 @@ mark{background:var(--hi);color:inherit;border-radius:3px;padding:0 2px}.mut{col
 .pager{display:flex;gap:8px;align-items:center;justify-content:space-between;margin-top:10px;flex-wrap:wrap}
 button{padding:7px 12px;border:1px solid var(--bd);border-radius:8px;background:var(--card);color:var(--tx);cursor:pointer;font-size:13px}button:disabled{opacity:.4;cursor:default}
 #load{position:fixed;inset:0;background:var(--bg);display:flex;align-items:center;justify-content:center;flex-direction:column;z-index:9;font-size:16px;text-align:center;padding:20px}
-.lnk{display:inline-block;font-size:12px;font-weight:600;border-radius:6px;padding:3px 8px;margin:2px 4px 0 0;text-decoration:none;border:1px solid var(--bd);color:var(--tx);cursor:pointer;background:var(--card)}.lnk.wa{background:#25d366;border-color:#25d366;color:#07391a}.lnk.sm{background:var(--acs);border-color:var(--acs);color:var(--ac)}
+.lnk{cursor:pointer;display:inline-block;font-size:12px;font-weight:600;border-radius:6px;padding:3px 8px;margin:2px 4px 0 0;text-decoration:none;border:1px solid var(--bd);color:var(--tx);cursor:pointer;background:var(--card)}.lnk.wa{background:#25d366;border-color:#25d366;color:#07391a}.lnk.sm{background:var(--acs);border-color:var(--acs);color:var(--ac)}
 .gate{width:100%;max-width:340px}.gate input{width:100%;padding:12px;font-size:17px;border:2px solid var(--bd);border-radius:10px;background:var(--card);color:var(--tx);margin:10px 0;text-align:center;letter-spacing:.08em}.gate button{width:100%;padding:11px;font-size:15px;background:var(--ac);color:#fff;border-color:var(--ac)}.gerr{color:var(--rd);font-size:13px;min-height:18px}
 textarea#tpl{width:100%;min-height:210px;padding:10px;font:14px/1.4 system-ui,sans-serif;border:1px solid var(--bd);border-radius:8px;background:var(--bg);color:var(--tx)}details.msg summary{cursor:pointer;font-weight:600}
 .empty{padding:30px;text-align:center;color:var(--mut)}.tip{color:var(--mut);font-size:12px;margin-top:8px}
@@ -368,12 +368,18 @@ function bars(){
   $('bars').innerHTML=arr.length?arr.map(([k,n])=>'<div class="bar'+(sel===k?' on':'')+'" data-k="'+k+'"><div class="l"><span>'+esc(D.t[k])+'</span><span>'+fmt(n)+'</span></div><div class="t"><div class="f" style="width:'+(100*n/mx)+'%"></div></div></div>').join(''):'<div class="tip">No matches</div>';
   $('bars').querySelectorAll('.bar').forEach(b=>b.onclick=()=>setTaluka(+b.dataset.k));
 }
+const mk=m=>m?m.slice(0,2)+'XXXXX'+m.slice(7):'';
 function contact(i){
-  const m=D.m[i],msg=msgFor(i),enc=encodeURIComponent(msg);
+  const m=D.m[i];
   const cp='<a class="lnk" data-copy="'+i+'">Copy</a>';
   if(!m)return '<div class="mut">No mobile</div>'+cp;
-  return '<div><b>'+m+'</b></div><a class="lnk wa" target="_blank" rel="noopener" href="https://wa.me/91'+m+'?text='+enc+'">WhatsApp</a><a class="lnk sm" href="sms:+91'+m+'?&body='+enc+'">SMS</a>'+cp;
+  return '<div><b>'+mk(m)+'</b></div><a class="lnk wa" data-wa="'+i+'">WhatsApp</a><a class="lnk sm" data-sms="'+i+'">SMS</a>'+cp;
 }
+document.addEventListener('click',e=>{
+  const w=e.target.closest('[data-wa]'),s=e.target.closest('[data-sms]');
+  if(w){const i=+w.dataset.wa;window.open('https://wa.me/91'+D.m[i]+'?text='+encodeURIComponent(msgFor(i)),'_blank','noopener')}
+  else if(s){const i=+s.dataset.sms;location.href='sms:+91'+D.m[i]+'?&body='+encodeURIComponent(msgFor(i))}
+});
 function badge(s){return !s?'':'<span class="bd '+(s==='Deleted'?'del':'sh')+'">'+esc(s)+'</span>'}
 function render(){
   const tot=hits.length,pages=Math.max(1,Math.ceil(tot/PAGE));page=Math.min(Math.max(page,0),pages-1);
@@ -388,7 +394,7 @@ function render(){
 }
 async function exportCsv(){
   const q=s=>'"'+String(s).replace(/"/g,'""')+'"';const rows=['Sr No,Full Name,Status,Gender,Age,Mobile,Address,Taluka,District,Polling Station No,Sr in PS,Polling Station Name'];
-  for(const h of hits){const i=h.i,P=D.ps[D.p[i]];rows.push([i+1,q(D.n[i]),q(D.st[i]),D.g[i]?'F':'M',D.ag[i],D.m[i],q(D.a[i]),q(D.t[D.k[i]]),q(D.d[D.di[i]]),P[0],D.sp[i],q(P[1])].join(','))}
+  for(const h of hits){const i=h.i,P=D.ps[D.p[i]];rows.push([i+1,q(D.n[i]),q(D.st[i]),D.g[i]?'F':'M',D.ag[i],mk(D.m[i]),q(D.a[i]),q(D.t[D.k[i]]),q(D.d[D.di[i]]),P[0],D.sp[i],q(P[1])].join(','))}
   const data='\ufeff'+rows.join('\n');
   try{const dl=window.claude&&await window.claude.use('downloads');if(dl){await dl.save({filename:'voter_search_results.csv',data:new Blob([data],{type:'text/csv'})});return}}catch(e){if(e&&e.code==='declined')return}
   const a=document.createElement('a');a.href=URL.createObjectURL(new Blob([data],{type:'text/csv'}));a.download='voter_search_results.csv';a.click();
@@ -473,7 +479,7 @@ async function exportPdf(){
     const cols=[{h:'Sr.',w:38},{h:'Name',w:140},{h:'Sex/Age',w:40},{h:'Mobile',w:58},{h:'Address / Taluka, District',w:255},{h:'Polling station (No., Sr. in PS)',w:205}];
     if(hasQ)cols.push({h:'Match',w:30});
     const data=rows.map(h=>{const i=h.i,P=D.ps[D.p[i]];
-      const r=[String(i+1),D.n[i]+(D.st[i]?' ['+D.st[i]+']':''),(D.g[i]?'F':'M')+' / '+D.ag[i],D.m[i]||'-',D.a[i]+' | '+D.t[D.k[i]]+', '+D.d[D.di[i]],'No. '+P[0]+', Sr. '+D.sp[i]+' - '+P[1]];
+      const r=[String(i+1),D.n[i]+(D.st[i]?' ['+D.st[i]+']':''),(D.g[i]?'F':'M')+' / '+D.ag[i],mk(D.m[i])||'-',D.a[i]+' | '+D.t[D.k[i]]+', '+D.d[D.di[i]],'No. '+P[0]+', Sr. '+D.sp[i]+' - '+P[1]];
       if(hasQ)r.push(Math.round(h.score*100)+'%');return r});
     const res=buildPdf('Voter Search Results',summary,cols,data);
     const fn='voter_search_results.pdf';
